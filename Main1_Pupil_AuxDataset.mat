@@ -1,0 +1,515 @@
+% ***********************************************************************
+% Pupillography for Software Engineering: Frequency Band Analysis
+% Authors: Ricardo Couceiro, Julio Medeiros, Andre Bernardes
+% Description: Aux dataset - This script preprocesses Pupillography and eye-tracking data, 
+%              performs Pupillography analysis, and extracts features.
+% ***********************************************************************
+
+
+clear all
+close all
+clc
+
+addpath(genpath('DesiredPath1'))
+
+eeglab
+
+%%
+package_path = 'DesiredPath1'; %update this to the current package path
+
+data_path = [package_path '/Data/'];
+processed_data_path = [data_path 'Processed/Study 1/Stage 1/'];
+save_file_path_clean = [data_path 'Processed/Study 1/Stage 2/'];
+save_file_path = [data_path 'Processed/Study 1/Stage 3/'];
+
+load('DesiredPath1\orders_id_sub_0004_aux_dataset.mat');
+load('DesiredPath2\database_pupil_ECG.mat')
+
+%% Set global variables of the eyetracker
+screen_boundaries_x = [0 1920];
+screen_boundaries_y = [0 1080];
+
+et.images.screen_boundaries_x = screen_boundaries_x;
+et.images.screen_boundaries_y = screen_boundaries_y;
+
+screen_center = [960,540];
+et.images.screen_center = screen_center;
+
+cross_center = [966.5 502];
+et.images.cross_center = cross_center;
+
+screen_size = [1920 1080];
+et.images.screen_size = screen_size;
+
+eyet_sfreq = 120; 
+et.ref.sfreq = eyet_sfreq;
+
+
+id_suj_run = [];
+container_order = [];
+
+control_suj = 1;
+
+contador = 0;
+
+for i=1:32
+    % for i=5
+    subject_id = i
+    run_number = 1;
+    if (~isempty(database{i}))
+        
+        
+        contador = contador+1;
+        
+        et.ref.sfreq = eyet_sfreq;
+        fs = et.ref.sfreq;
+        time = [0:length(database{i, 1}.Eyetracker.RightEye.Pupil.Diameter)-1]/fs;
+        time_old = time(:);
+        pupil_dia_L_mm = mean(double([database{i, 1}.Eyetracker.RightEye.Pupil.Diameter,database{i, 1}.Eyetracker.LeftEye.Pupil.Diameter]),2);
+        org_pupil_dia_L_mm = pupil_dia_L_mm;
+        
+        
+        % Identify NaN values
+        nanIndices = isnan(org_pupil_dia_L_mm);
+        
+        % Replace NaN values with 0
+        org_pupil_dia_L_mm(nanIndices) = 0;
+        
+        %% There is no confidence measure in eyelink
+        pupil_confidence = ones(length(time),1);
+        ind_not_conf = find(org_pupil_dia_L_mm==0);
+        pupil_confidence(ind_not_conf) = 0;
+        ind_conf = find(pupil_confidence==1);
+        
+        
+        
+        %% Remove points that are not confident +-100ms
+        if ~isempty(ind_not_conf)
+            len_nconf_s = 0.1; %100 ms before and after sections without confidence
+            len_nconf_samp  = len_nconf_s*fs;
+            ind_not_conf2 = sort(unique([ind_not_conf ind_not_conf+[-len_nconf_samp:1:len_nconf_samp]]));
+            ind_not_conf2(find(ind_not_conf2<1 | ind_not_conf2>length(pupil_confidence))) = [];
+            pupil_confidence2 = ones(length(pupil_confidence),1);
+            pupil_confidence2(ind_not_conf2) = 0;
+            
+            ind_conf = find(pupil_confidence2==1);
+            ind_not_conf = find(pupil_confidence2<1);
+        end
+        
+        %%
+        disp('*******Finding outliers*****')
+        p = 1.5;
+        [ind_in,ind_out] = RemoveOutliersPupilD(pupil_dia_L_mm(ind_conf),p,0);
+        ind_in = ind_conf(ind_in);
+        ind_out = ind_conf(ind_out);
+        % ind_out = sort(unique([ind_out;ind_out+[-round(0.05*fs):1:round(0.05*fs)]']));
+        % ind_out(find(ind_out<1 | ind_out>length(pupil_confidence))) = [];
+        pupil_confidence3 = pupil_confidence2;
+        pupil_confidence3(ind_out) = 0;
+        ind_conf = find(pupil_confidence3==1);
+        %%
+        disp('*******Resampling time series*****')
+        data = pupil_dia_L_mm;
+        new_fs = 8; %% New frequency 50Hz
+        
+        
+        %Remove points with no confidence and interpolate
+        data2 = interp1(time(ind_conf),data(ind_conf),time,'linear');
+        
+        new_time = time(1):1/new_fs:time(end);  %new time vector with sample frequency of new_fs=50Hz
+        
+        %Resample with new sample frequency
+        data_resamp = interp1(time, data2, new_time,'pchip');
+        pupil_conf_resamp = interp1(time, pupil_confidence3, new_time,'nearest');
+        
+        
+        new_ind_conf = find(pupil_conf_resamp==1);
+        new_ind_nconf = find(pupil_conf_resamp<1);
+        new_ind_nconf_org = new_ind_nconf;
+        new_ind_nconf(find(new_ind_nconf>=new_ind_conf(end) | new_ind_nconf<=new_ind_conf(1))) = [];
+        new_ind_nconf = new_ind_nconf-new_ind_conf(1)+1;
+        new_time2 = new_time(new_ind_conf(1):new_ind_conf(end));
+        
+        data_resamp = interp1(new_time(new_ind_conf), data_resamp(new_ind_conf), new_time2,'pchip');
+        new_ind_conf = new_ind_conf-new_ind_conf(1)+1;
+        new_time = new_time2;
+        
+        %%
+        % figure
+        % hold on
+        % plot(time,pupil_confidence3)
+        % plot(new_time,pupil_conf_resamp,'r')
+        %%
+        % figure(1)
+        % hold on
+        % plot(time,pupil_dia_L_mm,'b')
+        % plot(time(ind_conf),pupil_dia_L_mm(ind_conf),'c')
+        % plot(time,data2)
+        % plot(new_time2,data_resamp,'r')
+        % plot(new_time,movmedian(data_resamp,200),'Linewidth',2,'Color','k')
+        % plot(new_time2(new_ind_nconf),data_resamp(new_ind_nconf),'*k')
+        % % pause;
+        % % continue;
+        
+        
+        %% confidence intervals
+        disp('*******Getting confidence intervals*****')
+        dif_conf = diff([0 pupil_conf_resamp]);
+        ind_beg = find(dif_conf>0);
+        ind_end = find(dif_conf<0)-1;
+        
+        if ind_end(1)<ind_beg(1)
+            ind_beg = [1 ind_beg];
+        end
+        if ind_end(end)<ind_beg(end)
+            ind_end = [ind_end length(pupil_conf_resamp)];
+        end
+        
+        %% choose window with more than 3 seconds
+        confidence_intervals = [ind_beg(:) ind_end(:)];
+        diff_int = confidence_intervals(:,2)-confidence_intervals(:,1);
+        ind = find(diff_int>3*new_fs,1,'first');
+        
+        %% No confidence intervals
+        disp('*******Getting  NO confidence intervals*****')
+        dif_conf = diff([0 pupil_conf_resamp]);
+        ind_beg = find(dif_conf<0);
+        ind_end = find(dif_conf>0)-1;
+        
+        if ind_end(1)<ind_beg(1)
+            ind_beg = [1 ind_beg];
+        end
+        if ind_end(end)<ind_beg(end)
+            ind_end = [ind_end length(pupil_conf_resamp)];
+        end
+        
+        %% choose window with more than 3 seconds
+        no_confidence_intervals = [ind_beg(:) ind_end(:)];
+        diff_int = no_confidence_intervals(:,2)-no_confidence_intervals(:,1);
+        ind = find(diff_int>3*new_fs,1,'first');
+        
+        gaps_length_s = diff_int/new_fs;
+        max_gap = max(gaps_length_s);
+        
+        %% Gap filling of pupil diam signal
+        
+        disp('*******Gap filling*****')
+        
+        M1 = round(3*new_fs);
+        M2 = max_gap*new_fs;
+        M = max([M1 M2]);
+        if M>10*new_fs, M = round(10*new_fs); end
+        
+        theta = 0.005;
+        rho = 0.5;
+        display = 0;
+        
+        [new_x] = iSSA_gap_fill(data_resamp,new_ind_nconf,M,theta,rho,display);
+        
+        % %% Plot data
+        % figure
+        % hold on
+        % plot(time,pupil_dia_L_mm,'b')
+        % plot(new_time,data_resamp,'y')
+        % plot(new_time,new_x,'r')
+        
+        %% Remove low frequency below 0.0004
+        
+        % adicionar passa baixo ver abaixo dos 4Hz due to jittering movements artifacts.
+        % adicionar passa alto 0.0004Hz to reduce the impact of medium-term nonstationary components present in the time interval being analyzed
+        
+        
+        data4 = new_x;
+        
+        % par=0.25;
+        % ord=fix(par*length(data4));
+        % new_x2= ecgLowPass(double(data4),new_fs,1,1,ord); %%% VER NOVA FREQUENCIA
+        %
+        Pupil=EEG;
+        Pupil.data = data4';
+        Pupil.time = new_time;
+        Pupil.srate = new_fs;
+        Pupil.nbchans = 1;
+        Pupil.pnts = length(data4);
+        
+        Pupil = pop_eegfiltnew(Pupil,0.0004,3.99,[],0,[],0);
+        
+        % par=0.25;
+        % ord=fix(par*length(new_x2));
+        % new_x2= ecgHighPass(double(new_x2),new_fs,0.00004,1,ord); %%% VER NOVA FREQUENCIA
+        
+        % par=0.25;
+        % ord=fix(par*length(new_x));
+        % new_x2= ecgLowPass(double(new_x),new_fs,[0.0004 3.99],1,ord); %%% VER NOVA FREQUENCIA
+        
+        disp('*******Removing low frequency from time series*****')
+        % data4 =new_x2;
+        
+        data4 = Pupil.data';
+        
+        
+        
+        %         % Plot data
+        %         fh = figure();
+        %         fh.WindowState = 'maximized';
+        %         hold on
+        %         plot(time,pupil_dia_L_mm,'b')
+        %         %plot(new_time,data_resamp,'y')
+        %         plot(new_time,new_x,'r')
+        %         title('Pupillography Signal before and after the Pre-Processing')
+        %         xlabel('Time (s)')
+        %         ylabel('Pupil Diameter (mm)')
+        %         legend('Original Signal','Pre-Processed Signal')
+        %         ax = gca;
+        %         ax.XLim = [500 550];
+        % %         ax.YLim = [0 4.000];
+        %         set(gca,'FontSize',20)
+        %         saveas(gcf,'Figures/Pre_Processed_PUP_aux_dataset.png')
+        
+        %%
+        data_pupil_diam = data4;
+        time_pupil_diam = new_time;
+        fs_pupil_diam = new_fs;
+        
+        time = time_pupil_diam(:);
+        data = data_pupil_diam(:);
+        fs = fs_pupil_diam;
+        
+        %% Frequency analysis of pupil diameter data
+        disp(['Frequency analysis of pupil data'])
+        
+        
+        %% Get data sections
+        disp('*******Getting time series corresponding to rest and code*****')
+        
+        offset_start=10; %% offset for trigger 2,4,5 -> start/end x secods after/before the trigger
+        offset_end = 1;
+        
+        trigger_text_start = database{i,1}.Events.taskEvents(2).Duration;
+        trigger_text_end = database{i,1}.Events.taskEvents(3).Duration;
+        
+        triggers.text.samples = find(time>=trigger_text_start+offset_start & time<=trigger_text_end-offset_end);
+        
+        rest.time_rest = time(triggers.text.samples);
+        rest.data_rest = data(triggers.text.samples);
+        
+        trigger_code_start = database{i,1}.Events.taskEvents(4).Duration;
+        trigger_code_end = database{i,1}.Events.taskEvents(5).Duration;
+        
+        triggers.code.samples = find(time>=trigger_code_start+offset_start & time<=trigger_code_end-offset_end);
+        
+        code.time_code = time(triggers.code.samples);
+        code.data_code = data(triggers.code.samples);
+        
+        
+        clean_PUP{subject_id,run_number}.rest = rest;
+        clean_PUP{subject_id,run_number}.code = code;
+        
+        %% Register events duration
+        % rest
+        try
+            info_times.rest.start = rest.time_rest(1);
+            info_times.rest.end = rest.time_rest(length(rest.time_rest));
+            info_times.rest.duration = info_times.rest.end - info_times.rest.start;
+        catch
+            info_times.rest.start = "Not Found";
+            info_times.rest.end = "Not Found";
+            info_times.rest.duration = "Not Found";
+        end
+        
+        % code
+        try
+            info_times.code.start = code.time_code(1);
+            info_times.code.end = code.time_code(length(code.time_code));
+            info_times.code.duration = info_times.code.end - info_times.code.start;
+        catch
+            info_times.code.start = "Not Found";
+            info_times.code.end = "Not Found";
+            info_times.code.duration = "Not Found";
+        end
+        
+        
+        %% Features extraction
+        % *PUP order*:
+        %freq_domain = {'psd_time', 'totPow', 'VLF', 'LF', 'HF'}
+        % *HRV order*:
+        %lines_freq = ["psd_time"; "psd_freq"; "psd"; "aT"; "aP"; "RaP"; "pT"; "pP"; "RpP"];
+        %lines_fd = ["psd_time"; "aT"; "pT"; "aP_VLF"; "aP_LF"; "aP_HF"; "pP_VLF"; "pP_LF"; "pP_HF";"RaP_VLF"; "RaP_LF"; "RaP_HF"; "RpP_VLF"; "RpP_LF"; "RpP_HF"; "aP_LF/HF"; "pP_LF/HF"];
+        %lines_fd = {'totPow'; 'Peak'; 'VLF'; 'LF'; 'HF'; 'VLFpeak'; 'LFpeak'; 'HFpeak';'VLFnu'; 'LFnu'; 'HFnu'; 'VLFpeak-nu'; 'LFpeak-nu'; 'HFpeak-nu'; 'LF/HF'; 'LFpeak/HFpeak'};
+        
+        % Parameter initialization
+        just_one_value = false; % Para otimizar o programa quando só existe necessidade de calc um valor (só usamos dps)
+        
+        type_order = 3; % 1 para sub/run; 2 para sub; 3 para geral
+        criteria = 2; % 1 AIC // 2 BIC // 3 MDL
+        
+        labels_sub_id = orders_id_sub.labels;
+        container_sub_id = orders_id_sub.container;
+        
+        if type_order==1
+            idx_to_extract = find(labels_sub_id(:,1)==subject_id & labels_sub_id(:,2)==run_number); % Indices of rows with 1 in first column and 2 in second column
+            idx_extracted = container_sub_id(idx_to_extract, criteria); % Extract rows with desired values
+            
+        elseif type_order==2
+            idx_to_extract = find(labels_sub_id(:,1)==subject_id); % Indices of rows with 1 in first column and 2 in second column
+            idx_extracted = container_sub_id(idx_to_extract, criteria); % Extract rows with desired values
+            
+        elseif type_order==3
+            idx_extracted = container_sub_id(:, criteria); % Extract rows with desired values
+            
+        end
+        
+        AA = idx_extracted(:);
+        median_result = median(AA); % Compute median of the extracted rows
+        % median_result = quantile(AA,0.75); % Compute 3rd quartile of the extracted rows
+        
+        order = round(median_result);
+        order = max(order,149);
+        
+        typePsd = 0; % burg
+        display = 0; % mudei para 0, 1 aparecem gráficos
+        
+        window_secs = 180; %25;
+        window_samp =  window_secs * fs;
+        
+        jump_secs = 1;
+        jump_samp = floor(jump_secs*fs);
+        
+        freq_vec = 0:0.005:10;
+        
+        %% PSD computation - //Já descarta valores iniciais e finais
+        % ----- CODE -----
+        [global_features_PUP_PSD{subject_id,run_number}.code.psd_time, global_features_PUP_PSD{subject_id,run_number}.code.psd_freq,...
+            global_features_PUP_PSD{subject_id,run_number}.code.psd] = PSD_TimeVariant_FreqAnalysis(code.time_code, code.data_code, fs, typePsd, freq_vec, window_samp, jump_samp, display, false, window_secs,order);
+        
+        % figure
+        % for kkk=1:20:200
+        %     plot(global_features_PUP_PSD{5, 1}.code.psd_freq(50:100,1),global_features_PUP_PSD{5, 1}.code.psd(50:100,kkk))
+        % hold on
+        % end
+        
+        %% Bands definition // for correlation analysis
+        global_features_PUP_fd_corr{subject_id,run_number}.code.psd_time = global_features_PUP_PSD{subject_id,run_number}.code.psd_time;
+        
+        
+        position = 0;
+        
+    for band_limit1=[0.02:0.02:0.20] 
+        for band_limit2=[band_limit1+0.10:0.02:0.6] %min inter
+            
+            if round(band_limit1,2) >= round(band_limit2,2)
+                continue;
+            end
+            for band_limit3=[band_limit2]   
+                for band_limit4=[band_limit3+0.10:0.02:1]   
+                        
+                        if round(band_limit3,2) >= round(band_limit4,2)
+                            continue;
+                        end
+                        %             tic
+                        LF_band =[round(band_limit1,2) round(band_limit2,2)];
+                        HF_band = [round(band_limit3,2) round(band_limit4,2)];
+                        
+                        position = position + 1;
+                        
+                        [global_features_PUP_fd_corr{subject_id,run_number}.code.LF{1, position}, ...
+                            global_features_PUP_fd_corr{subject_id,run_number}.code.HF{1, position}, ...
+                            global_features_PUP_fd_corr{subject_id,run_number}.code.LF_HF{1, position}] = andre_Freq3FeaturesExtraction(global_features_PUP_PSD{subject_id,run_number}.code.psd_freq,...
+                            global_features_PUP_PSD{subject_id,run_number}.code.psd, LF_band, HF_band);
+                        
+                        % Info
+                        freq_band_info = [round(band_limit1,2) round(band_limit2,2) round(band_limit3,2) round(band_limit4,2)];
+                        global_features_PUP_fd_corr{subject_id,run_number}.code.bands_info{1, position} = freq_band_info;
+                        %             toc
+                        
+                    end
+                end
+                
+            end
+            
+        end
+        
+        %% Related Work
+        
+        LF_band =[round(0.04,2) round(0.15,2)];
+        HF_band = [round(0.15,2) round(0.40,2)];
+        position = position + 1;
+        
+        [global_features_PUP_fd_corr{subject_id,run_number}.code.LF{1, position}, ...
+            global_features_PUP_fd_corr{subject_id,run_number}.code.HF{1, position}, ...
+            global_features_PUP_fd_corr{subject_id,run_number}.code.LF_HF{1, position}] = andre_Freq3FeaturesExtraction(global_features_PUP_PSD{subject_id,run_number}.code.psd_freq,...
+            global_features_PUP_PSD{subject_id,run_number}.code.psd, LF_band, HF_band);
+        
+        freq_band_info = [LF_band, HF_band];
+        global_features_PUP_fd_corr{subject_id,run_number}.code.bands_info{1, position} = freq_band_info;
+        
+        LF_band =[round(0.05,2) round(0.15,2)];
+        HF_band = [round(0.15,2) round(0.45,2)];
+        
+        position = position + 1;
+        
+        [global_features_PUP_fd_corr{subject_id,run_number}.code.LF{1, position}, ...
+            global_features_PUP_fd_corr{subject_id,run_number}.code.HF{1, position}, ...
+            global_features_PUP_fd_corr{subject_id,run_number}.code.LF_HF{1, position}] = andre_Freq3FeaturesExtraction(global_features_PUP_PSD{subject_id,run_number}.code.psd_freq,...
+            global_features_PUP_PSD{subject_id,run_number}.code.psd, LF_band, HF_band);
+        
+        % Info
+        freq_band_info = [LF_band, HF_band];
+        global_features_PUP_fd_corr{subject_id,run_number}.code.bands_info{1, position} = freq_band_info;
+        
+        LF_band =[round(0.1,2) round(0.5,2)];
+    HF_band = [round(1.6,2) round(3.5,2)];
+    
+    position = position + 1;
+    
+    [global_features_PUP_fd_corr{subject_id,run_number}.code.LF{1, position}, ...
+        global_features_PUP_fd_corr{subject_id,run_number}.code.HF{1, position}, ...
+        global_features_PUP_fd_corr{subject_id,run_number}.code.LF_HF{1, position}] = andre_Freq3FeaturesExtraction(global_features_PUP_PSD{subject_id,run_number}.code.psd_freq,...
+        global_features_PUP_PSD{subject_id,run_number}.code.psd, LF_band, HF_band);
+    
+    % Info
+    freq_band_info = [LF_band, HF_band];
+    global_features_PUP_fd_corr{subject_id,run_number}.code.bands_info{1, position} = freq_band_info;
+    
+    
+    LF_band =[round(0,2) round(1.6,2)];
+    HF_band = [round(1.6,2) round(4,2)];
+    
+    position = position + 1;
+    
+    [global_features_PUP_fd_corr{subject_id,run_number}.code.LF{1, position}, ...
+        global_features_PUP_fd_corr{subject_id,run_number}.code.HF{1, position}, ...
+        global_features_PUP_fd_corr{subject_id,run_number}.code.LF_HF{1, position}] = andre_Freq3FeaturesExtraction(global_features_PUP_PSD{subject_id,run_number}.code.psd_freq,...
+        global_features_PUP_PSD{subject_id,run_number}.code.psd, LF_band, HF_band);
+    
+    % Info
+    freq_band_info = [LF_band, HF_band];
+    global_features_PUP_fd_corr{subject_id,run_number}.code.bands_info{1, position} = freq_band_info;
+        
+        clearvars global_features_PUP_PSD;
+        
+        %% Add Infos
+        
+        lines_fd = {'psd_time';'totPow'; 'Peak'; 'LF'; 'HF'; 'LFpeak'; 'HFpeak'; 'LFnu'; 'HFnu'; 'LFpeak-nu'; 'HFpeak-nu'; 'LF/HF'; 'LFpeak/HFpeak'};
+        global_features_PUP_fd_corr{subject_id,run_number}.info_times = info_times;
+        
+        toc
+
+        global_features_PUP_fd_corr_iteration = global_features_PUP_fd_corr(subject_id,:);
+        global_features_PUP_fd_corr_iteration{1,5}=(subject_id);
+        filename = "global_features_PUP_fd_corr_part" + mat2str(subject_id) + "_aux_dataset.mat";
+        save(fullfile('DesiredPath1\Code\Study 1\main_funcs\2_Analyse_HRV_and_PUP_data\AndreBernardes_code\Extracted_PUPfeatures_Structs\PUP_corr_parts_type_3_aux_dataset', filename), 'global_features_PUP_fd_corr_iteration','-v7.3');
+        clearvars global_features_PUP_fd_corr_iteration;
+        clearvars global_features_PUP_fd_corr;
+        
+    else
+        
+        global_features_PUP_fd_corr_iteration{1,5}=(subject_id);
+        filename = "global_features_PUP_fd_corr_part" + mat2str(subject_id) + "_aux_dataset.mat";
+        save(fullfile('DesiredPath1\Code\Study 1\main_funcs\2_Analyse_HRV_and_PUP_data\AndreBernardes_code\Extracted_PUPfeatures_Structs\PUP_corr_parts_type_3_aux_dataset', filename), 'global_features_PUP_fd_corr_iteration','-v7.3');
+        clearvars global_features_PUP_fd_corr_iteration;
+        clearvars global_features_PUP_fd_corr;
+        
+        
+    end
+end

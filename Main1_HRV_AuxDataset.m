@@ -1,7 +1,7 @@
 % ***********************************************************************
 % Pupillography for Software Engineering: Frequency Band Analysis
 % Authors: Ricardo Couceiro, Julio Medeiros, Andre Bernardes
-% Description: This script preprocesses ECG and eye-tracking data, 
+% Description: Aux dataset - This script preprocesses ECG and eye-tracking data, 
 %              performs HRV analysis, and extracts features.
 % ***********************************************************************
 

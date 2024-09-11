@@ -1,0 +1,594 @@
+clear all
+% close all
+clc
+
+%% Load Files With the features
+% Bands Info 
+filename = strcat('bands_info.mat');
+load(fullfile(pwd,'Correlations_Files', filename), 'bands_info');
+
+% Correlation Results
+filename = strcat('PUP_global_correlation_xcorr_type_3_aux_dataset.mat');
+load(fullfile(pwd,'Correlations_Files', filename), 'PUP_global_correlation');
+
+% Multicompare
+% filename = strcat('PUP_global_correlation_xcorr_type_3_multiCompareData.mat');
+% load(fullfile(pwd,'Correlations_Files', filename), 'multiCompareData');
+
+
+% load('D:\Delivery_AndreBernardes\Pupil_Code\Ricardo_DATA_CODES\Code\Study 1\main_funcs\2_Analyse_HRV_and_PUP_data\AndreBernardes_code\Correlations_Files\PUP_global_correlation_xcorr_type_3_detailed_infor.mat')
+
+%% Compute geometric mean LF and HF
+LF_percentage = cell2mat(PUP_global_correlation.LF.Rejected_percentage_Pearson);
+HF_percentage = cell2mat(PUP_global_correlation.HF.Rejected_percentage_Pearson);
+LF_HF_percentage = cell2mat(PUP_global_correlation.LF_HF.Rejected_percentage_Pearson);
+
+LF_mean_corr = cell2mat(PUP_global_correlation.LF.FISHERsPearson_mean);
+HF_mean_corr = cell2mat(PUP_global_correlation.HF.FISHERsPearson_mean);
+LF_HF_mean_corr =cell2mat(PUP_global_correlation.LF_HF.FISHERsPearson_mean);
+
+% Compute geometric mean LF and HF
+geomean_percentages_LF_HF = sqrt(LF_percentage .* HF_percentage);
+geomean_corrs_LF_HF = sqrt(LF_mean_corr .* HF_mean_corr);
+
+geomean_percentages_LF_HF_ratio = nthroot(LF_percentage .* HF_percentage.*LF_HF_percentage,3);
+geomean_corrs_LF_HF_ratio = nthroot(LF_mean_corr .* HF_mean_corr.*LF_HF_mean_corr,3);
+
+idxs_to_keep=logical((~[isnan(LF_mean_corr)].* ~[isnan(HF_mean_corr)] .* ~[isnan(LF_HF_mean_corr)]));
+
+relatedStudies = [idxs_to_keep(end-3:end)]
+
+sigFisher_LF = PUP_global_correlation.LF.signifiscance_fisherPearson;
+sigFisher_HF = PUP_global_correlation.HF.signifiscance_fisherPearson;
+sigFisher_LF_HF = PUP_global_correlation.LF_HF.signifiscance_fisherPearson;
+
+sigFisher_LF_clean = PUP_global_correlation.LF.signifiscance_fisherPearson(idxs_to_keep);
+sigFisher_HF_clean = PUP_global_correlation.HF.signifiscance_fisherPearson(idxs_to_keep);
+sigFisher_LF_HF_clean = PUP_global_correlation.LF_HF.signifiscance_fisherPearson(idxs_to_keep);
+
+
+LF_perm = cell2mat(PUP_global_correlation.LF.Rejected_percentage_Perm_Pearson);
+HF_perm = cell2mat(PUP_global_correlation.HF.Rejected_percentage_Perm_Pearson);
+LF_HF_perm =cell2mat(PUP_global_correlation.LF_HF.Rejected_percentage_Perm_Pearson);
+
+LF_perm_clean = LF_perm(idxs_to_keep);
+HF_perm_clean = HF_perm(idxs_to_keep);
+LF_HF_perm_clean = LF_HF_perm(idxs_to_keep);
+
+geomean_perm_LF_HF_ratio_clean = nthroot(LF_perm_clean .* HF_perm_clean .* LF_HF_perm_clean,3);
+
+%% Clean bands without data in the HF band
+HF_mean_corr_clean = HF_mean_corr(idxs_to_keep);
+LF_mean_corr_clean = LF_mean_corr(idxs_to_keep);
+LF_HF_mean_corr_clean = LF_HF_mean_corr(idxs_to_keep);
+geomean_corrs_LF_HF_clean = geomean_corrs_LF_HF(idxs_to_keep);
+
+LF_percentage_clean = LF_percentage(idxs_to_keep);
+HF_percentage_clean = HF_percentage(idxs_to_keep);
+LF_HF_percentage_clean = LF_HF_percentage(idxs_to_keep);
+geomean_percentages_LF_HF_clean = geomean_percentages_LF_HF(idxs_to_keep);
+
+geomean_corrs_LF_HF_ratio_clean = geomean_corrs_LF_HF_ratio(idxs_to_keep);
+geomean_percentages_LF_HF_ratio_clean = geomean_percentages_LF_HF_ratio(idxs_to_keep);
+
+
+bands_info_clean = bands_info(idxs_to_keep);
+
+% multiCompareData.LF_mean_corr_clean = PUP_global_correlation.rawCorrelationValues.LF_mean_corr(:,idxs_to_keep);
+% multiCompareData.HF_mean_corr_clean = PUP_global_correlation.rawCorrelationValues.HF_mean_corr(:,idxs_to_keep);
+% multiCompareData.LF_HF_mean_corr_clean= PUP_global_correlation.rawCorrelationValues.LF_HF_mean_corr(:,idxs_to_keep);
+% 
+% multiCompareData.Gmean_corrs_LF_HF_ratio_clean = nthroot(multiCompareData.LF_mean_corr_clean .* multiCompareData.HF_mean_corr_clean.*multiCompareData.LF_HF_mean_corr_clean,3);
+
+
+%% Approach - geometic mean LF, HF and LF/HF ratio
+
+%% Compute top 10 - by mean corr
+
+related_studies_id = length(geomean_corrs_LF_HF_ratio_clean);
+related_studies_id = [related_studies_id-3:related_studies_id];
+[sorted_array, idx_ordered_app3] = sort(geomean_corrs_LF_HF_ratio_clean,'descend');
+% idx_top10_app3 = [idx_ordered_app3(1:20)];
+% idx_top10_app3 = ([idx_ordered_app3(1:20),32891,32892]);
+% idx_top10_app3 = ([idx_ordered_app3(1:10),21,22]);
+idx_top10_app3 = ([idx_ordered_app3(1:10),related_studies_id]);
+
+geomean_percentages_LF_HF_app3_top10 = geomean_percentages_LF_HF_ratio_clean(idx_top10_app3);
+LF_percentage_app3_top10 = LF_percentage_clean(idx_top10_app3);
+HF_percentage_app3_top10 = HF_percentage_clean(idx_top10_app3);
+LF_HF_percentage_app3_top10 = LF_HF_percentage_clean(idx_top10_app3);
+
+geomean_corrs_LF_HF_app3_top10 = geomean_corrs_LF_HF_ratio_clean(idx_top10_app3);
+LF_mean_corr_app3_top10 = LF_mean_corr_clean(idx_top10_app3);
+HF_mean_corr_app3_top10 = HF_mean_corr_clean(idx_top10_app3);
+LF_HF_mean_corr_app3_top10 = LF_HF_mean_corr_clean(idx_top10_app3);
+
+selected_bands_app3_top10 = bands_info_clean(idx_top10_app3);
+
+sigFisher_LF_app3_top10 = sigFisher_LF_clean(idx_top10_app3);
+sigFisher_HF_app3_top10 = sigFisher_HF_clean(idx_top10_app3);
+sigFisher_LF_HF_app3_top10 = sigFisher_LF_HF_clean(idx_top10_app3);
+
+significances_app3 = [sigFisher_LF_app3_top10;sigFisher_HF_app3_top10;sigFisher_LF_HF_app3_top10];
+
+LF_perm_app3_top10 = LF_perm_clean(idx_top10_app3);
+HF_perm_app3_top10 = HF_perm_clean(idx_top10_app3);
+LF_HF_perm_app3_top10 = LF_HF_perm_clean(idx_top10_app3);
+geomean_perm_app3_top10 = geomean_perm_LF_HF_ratio_clean(idx_top10_app3);
+
+
+% %% Multicompare
+% 
+% sizeData = length(multiCompareData.Gmean_corrs_LF_HF_ratio_clean);
+% data2inspect_gmean = multiCompareData.Gmean_corrs_LF_HF_ratio_clean(:,[idx_top10_app3]);
+% 
+% % for i = 1:size(data2inspect_gmean,2)
+% %     checkingDataNormality = kstest(data2inspect_gmean(:,i));
+% %     if checkingDataNormality
+% %         i
+% %         break
+% %     end    
+% % end
+% 
+% % if checkingDataNormality
+% %     [p,tbl,stats] = kruskalwallis(data2inspect,"off");
+%     [p,tbl,stats] = kruskalwallis(data2inspect_gmean);
+% %     543.564853 seconds.
+% % else
+% %     [p,tbl,stats] = anova1(data2inspect_gmean);
+% % end
+% 
+% [results,means,~,gnames] = multcompare(stats);
+% % [results,means,~,gnames] = multcompare(stats,"ctype","bonferroni");
+% 
+% 
+% data2inspect_LF = multiCompareData.LF_mean_corr_clean(:,[idx_top10_app3]);
+% [p,tbl,stats] = kruskalwallis(data2inspect_LF);
+% [results_LF,means,~,gnames] = multcompare(stats);
+% % [results_LF,means,~,gnames] = multcompare(stats,"ctype","bonferroni");
+% 
+% data2inspect_HF = multiCompareData.HF_mean_corr_clean(:,[idx_top10_app3]);
+% [p,tbl,stats] = kruskalwallis(data2inspect_HF);
+% [results_HF,means,~,gnames] = multcompare(stats);
+% % [results_HF,means,~,gnames] = multcompare(stats,"ctype","bonferroni");
+% 
+% data2inspect_LF_HF = multiCompareData.LF_HF_mean_corr_clean(:,[idx_top10_app3]);
+% [p,tbl,stats] = kruskalwallis(data2inspect_LF_HF);
+% [results_LF_HF,means,~,gnames] = multcompare(stats);
+% % [results_LF_HF,means,~,gnames] = multcompare(stats,"ctype","bonferroni");
+
+
+
+
+%%
+% 
+% %%
+% % LF_lag = [];
+% % HF_lag = [];
+% % LFHF_lag = [];
+% % all_lags = [];
+% % for id=1:32
+% %     for r=1
+% %         if(~isempty(PUP_global_correlation.PUP_bands_corr{id,r}))
+% %             if(~isempty(PUP_global_correlation.PUP_bands_corr{id, r}.LF_HF.lag))
+% %                 m = reshape(PUP_global_correlation.PUP_bands_corr{id, r}.LF_HF.lag, 3, []);
+% %                 
+% %                 m = m(:,idxs_to_keep);
+% %                 m = m(:,idx_top10_app3);
+% %                 
+% %                 LF_lag = [LF_lag; m(1,:)];
+% %                 HF_lag = [HF_lag; m(2,:)];
+% %                 LFHF_lag = [LFHF_lag; m(3,:)];
+% %                 all_lags = [all_lags; m];
+% %             end
+% %             
+% %         end
+% %     end
+% % end
+% figure
+% histogram(LF_lag(:),[-50:50],'Normalization','probability')
+% title('LF lag')
+% 
+% % SAVE
+% saveas(gcf,strcat('Figures/',filename(1:end-4),'_Approach3_LF_lag_Pearson.png'))
+% 
+% figure
+% histogram(HF_lag(:),[-50:50],'Normalization','probability')
+% title('HF lag')
+% 
+% % SAVE
+% saveas(gcf,strcat('Figures/',filename(1:end-4),'_Approach3_HF_lag_Pearson.png'))
+%   
+% figure
+% histogram(LFHF_lag(:),[-50:50],'Normalization','probability')
+% title('LF/HF lag')
+% % SAVE
+% saveas(gcf,strcat('Figures/',filename(1:end-4),'_Approach3_LFHF_lag_Pearson.png'))
+
+all_lags = zeros(3,12);
+
+% %% Heatmap
+% for i=1:length(selected_bands_app3_top10)
+%      band_name = "BANDS = [" + mat2str(selected_bands_app3_top10{1, i}(1)) + ",  " + mat2str(selected_bands_app3_top10{1, i}(2)) + ",  " + mat2str(selected_bands_app3_top10{1, i}(4)) +"]";
+%      xvalues_app3{1,i} = band_name;
+% end
+% yvalues = {'LF', 'HF', 'LF/HF', 'gMean(LF*HF*Ratio)'}
+% 
+% A = [LF_mean_corr_app3_top10; HF_mean_corr_app3_top10; LF_HF_mean_corr_app3_top10; geomean_corrs_LF_HF_app3_top10];
+% fh = figure();
+% fh.WindowState = 'maximized';
+% subplot(31,1,[1:8])
+% h = heatmap(A, 'ColorbarVisible', 'on');
+% h.ColorScaling = 'scaledrows';
+% % h.XDisplayLabels = xvalues_app3;
+% h.YDisplayLabels = yvalues;
+% h.Title = 'Approach 3 - GMean3 LF*HF*Ratio';
+% h.YLabel = 'Mean Correlation';
+% ax = gca;
+% ax.FontSize = 14; 
+% colormap('pink')
+% 
+% fisher_A = cell2mat(significances_app3);
+% fisher_values = {'LF', 'HF', 'LF/HF'}
+% subplot(31,1,[9:14])
+% h = heatmap(fisher_A, 'ColorbarVisible', 'on');
+% h.ColorScaling = 'scaledrows';
+% % h.XDisplayLabels = xvalues_app3;
+% h.YDisplayLabels = fisher_values;
+% % h.Title = 'Approach 3 - GMean3 LF*HF*Ratio';
+% h.YDisplayLabels = {'LF', 'HF', 'LF/HF'}
+% h.YLabel = 'Fisher Significance';
+% ax = gca;
+% ax.FontSize = 14; 
+% colormap(flipud(pink))
+% 
+% 
+% A = [LF_percentage_app3_top10; HF_percentage_app3_top10; LF_HF_percentage_app3_top10; geomean_percentages_LF_HF_app3_top10];
+% subplot(31,1,[15:22])
+% h = heatmap(A, 'ColorbarVisible', 'on');
+% h.ColorScaling = 'scaledrows';
+% % h.XDisplayLabels = xvalues_app3;
+% h.YDisplayLabels = yvalues;
+% h.YLabel = '% where exists Correlation';
+% ax = gca;
+% ax.FontSize = 14; 
+% colormap('pink')
+% 
+% 
+% A = [LF_perm_app3_top10; HF_perm_app3_top10; LF_HF_perm_app3_top10; geomean_perm_app3_top10];
+% subplot(31,1,[23:30])
+% h = heatmap(A, 'ColorbarVisible', 'on');
+% h.ColorScaling = 'scaledrows';
+% % h.XDisplayLabels = xvalues_app3;
+% h.YDisplayLabels = yvalues;
+% h.YLabel = '% where exists Correlation';
+% ax = gca;
+% ax.FontSize = 14; 
+% colormap('pink')
+% 
+% 
+% 
+% subplot(31,1,31)
+% h = heatmap(median(all_lags), 'ColorbarVisible', 'off');
+% h.ColorScaling = 'scaledrows';
+% h.XDisplayLabels = xvalues_app3;
+% h.YDisplayLabels = 'Median Lags';
+% h.YLabel = 'Median Lags';
+% ax = gca;
+% ax.FontSize = 14; 
+% colormap(pink)
+% % SAVE
+% % saveas(gcf,strcat('Figures/',filename(1:end-4),'_Approach3_top20_Pearson.png'))
+% % saveas(gcf,strcat('Figures/',filename(1:end-4),'_Approach3_top20_Pearson.fig'))
+% 
+% 
+% 
+% 
+% fisher_A = cell2mat(significances_app3);
+% fisher_values = {'LF', 'HF', 'LF/HF'}
+% fh = figure();
+% fh.WindowState = 'maximized';
+% subplot(10,1,[1:8])
+% h = heatmap(fisher_A, 'ColorbarVisible', 'off');
+% % h.XDisplayLabels = xvalues_app3;
+% h.YDisplayLabels = fisher_values;
+% h.Title = 'Approach 3 - GMean3 LF*HF*Ratio';
+% h.YLabel = 'Fisher Significance';
+% ax = gca;
+% ax.FontSize = 14; 
+% colormap(flipud(pink))
+% 
+% h.XDisplayLabels = xvalues_app3;
+% 
+% % saveas(gcf,strcat('Figures/',filename(1:end-4),'_Approach3_significance_top20_Pearson.png'))
+% % saveas(gcf,strcat('Figures/',filename(1:end-4),'_Approach3_significance_top20_Pearson.fig'))
+
+
+%% Heatmap CORR
+for i=1:length(selected_bands_app3_top10)
+     band_name = "[" + mat2str(selected_bands_app3_top10{1, i}(1)) + ",  " + mat2str(selected_bands_app3_top10{1, i}(2)) + ",  " + mat2str(selected_bands_app3_top10{1, i}(4)) +"]";
+     xvalues_app3{1,i} = band_name;
+end
+yvalues = {'LF', 'HF', 'LF/HF', 'gMean'}
+
+A = [LF_mean_corr_app3_top10; HF_mean_corr_app3_top10; LF_HF_mean_corr_app3_top10; geomean_corrs_LF_HF_app3_top10];
+C = cell(1,14);
+C(:) = {''};
+
+fh = figure();
+fh.WindowState = 'maximized';
+subplot(27,7,[1:6,8:13])
+h = heatmap(A(1,:), 'ColorbarVisible', 'on');
+h.CellLabelFormat = '%.3f';
+% h.ColorScaling = 'scaledrows';
+% h.XDisplayLabels = xvalues_app3;
+h.XDisplayLabels = C;
+h.YDisplayLabels = yvalues(1);
+% h.Title = 'Approach 3 - GMean3 LF*HF*Ratio';
+% h.YLabel = 'Mean Correlation';
+ax = gca;
+ax.FontSize = 12; 
+colormap('pink')
+
+s = struct(h);
+s.YAxis.FontSize = 12;
+s.Colorbar.FontSize = 6.5; 
+% s.ColorLimits = [min(A(1,:)) max(A(1,:))];
+
+subplot(27,7,[15:20,22:27])
+h = heatmap(A(2,:), 'ColorbarVisible', 'on');
+h.CellLabelFormat = '%.3f';
+% h.ColorScaling = 'scaledrows';
+% h.XDisplayLabels = xvalues_app3;
+h.XDisplayLabels = C;
+h.YDisplayLabels = yvalues(2);
+% h.Title = 'Approach 3 - GMean3 LF*HF*Ratio';
+% h.YLabel = 'Mean Correlation';
+ax = gca;
+ax.FontSize = 12; 
+colormap('pink')
+
+s = struct(h);
+s.YAxis.FontSize = 12;
+s.Colorbar.FontSize = 6.5; 
+% s.ColorLimits = [min(A(2,:)) max(A(2,:))];
+
+subplot(27,7,[29:34,36:41])
+h = heatmap(A(3,:), 'ColorbarVisible', 'on');
+h.CellLabelFormat = '%.3f';
+% h.ColorScaling = 'scaledrows';
+% h.XDisplayLabels = xvalues_app3;
+h.XDisplayLabels = C;
+h.YDisplayLabels = yvalues(3);
+% h.Title = 'Approach 3 - GMean3 LF*HF*Ratio';
+% h.YLabel = 'Mean Correlation';
+ax = gca;
+ax.FontSize = 12; 
+colormap('pink')
+
+s = struct(h);
+s.YAxis.FontSize = 12;
+s.Colorbar.FontSize = 6.5; 
+% s.ColorLimits = [min(A(3,:)) max(A(3,:))];
+
+subplot(27,7,[43:48,50:55])
+h = heatmap(A(4,:), 'ColorbarVisible', 'on');
+h.CellLabelFormat = '%.3f';
+% h.ColorScaling = 'scaledrows';
+h.XDisplayLabels = xvalues_app3;
+h.YDisplayLabels = yvalues(4);
+% h.Title = 'Approach 3 - GMean3 LF*HF*Ratio';
+% h.YLabel = 'Mean Correlation';
+ax = gca;
+ax.FontSize = 12;
+colormap('pink')
+
+
+
+s = struct(h);
+s.YAxis.FontSize = 12;
+s.Colorbar.FontSize = 6.5; 
+% s.ColorLimits = [min(A(4,:)) max(A(4,:))];
+
+s = struct(h);
+s.XAxis.FontSize = 10;
+
+annotation(fh,'line',[0.679791666666667,0.679791666666667],[0.948961578400831,0.66896157840083],...
+    'Color',[1 0.411764705882353 0.16078431372549],...
+    'LineWidth',2,...
+    'LineStyle','-.');
+
+h=gcf;
+set(h,'PaperOrientation','landscape');
+set(h,'PaperPosition', [1 1 28 19]);
+print(gcf, '-dpdf', 'Figures/study2_corr.pdf');
+saveas(gcf,strcat('Figures/','study2_corr.fig'))
+
+
+
+%% Heatmap Significance
+for i=1:length(selected_bands_app3_top10)
+     band_name = "[" + mat2str(selected_bands_app3_top10{1, i}(1)) + ",  " + mat2str(selected_bands_app3_top10{1, i}(2)) + ",  " + mat2str(selected_bands_app3_top10{1, i}(4)) +"]";
+     xvalues_app3{1,i} = band_name;
+end
+yvalues = {'LF', 'HF', 'LF/HF', 'gMean'}
+
+
+fisher_A = cell2mat(significances_app3);
+A = fisher_A;
+C = cell(1,14);
+C(:) = {''};
+
+fh = figure();
+fh.WindowState = 'maximized';
+subplot(27,7,[1:6,8:13])
+h = heatmap(A(1,:), 'ColorbarVisible', 'on');
+h.CellLabelFormat = '%.1e';
+% h.ColorScaling = 'scaledrows';
+% h.XDisplayLabels = xvalues_app3;
+h.XDisplayLabels = C;
+h.YDisplayLabels = yvalues(1);
+% h.Title = 'Approach 3 - GMean3 LF*HF*Ratio';
+% h.YLabel = 'Mean Correlation';
+ax = gca;
+ax.FontSize = 12; 
+colormap(flipud(pink))
+s = struct(h);
+s.YAxis.FontSize = 12;
+
+s = struct(h);
+s.YAxis.FontSize = 12;
+s.Colorbar.FontSize = 6.5; 
+
+
+subplot(27,7,[15:20,22:27])
+h = heatmap(A(2,:), 'ColorbarVisible', 'on');
+h.CellLabelFormat = '%.1e';
+% h.ColorScaling = 'scaledrows';
+% h.XDisplayLabels = xvalues_app3;
+h.XDisplayLabels = C;
+h.YDisplayLabels = yvalues(2);
+% h.Title = 'Approach 3 - GMean3 LF*HF*Ratio';
+% h.YLabel = 'Mean Correlation';
+ax = gca;
+ax.FontSize = 12; 
+colormap(flipud(pink))
+
+s = struct(h);
+s.YAxis.FontSize = 12;
+s.Colorbar.FontSize = 6.5; 
+
+s = struct(h);
+s.YAxis.FontSize = 12;
+
+subplot(27,7,[29:34,36:41])
+h = heatmap(A(3,:), 'ColorbarVisible', 'on');
+h.CellLabelFormat = '%.1e';
+% h.ColorScaling = 'scaledrows';
+h.XDisplayLabels = xvalues_app3;
+h.YDisplayLabels = yvalues(3);
+% h.Title = 'Approach 3 - GMean3 LF*HF*Ratio';
+% h.YLabel = 'Mean Correlation';
+ax = gca;
+ax.FontSize = 12; 
+colormap(flipud(pink))
+
+s = struct(h);
+s.YAxis.FontSize = 12;
+s.Colorbar.FontSize = 6.5; 
+
+s = struct(h);
+s.XAxis.FontSize = 10;
+
+annotation(fh,'line',[0.679791666666667,0.679791666666667],[0.948961578400831,0.735],...
+    'Color',[1 0.411764705882353 0.16078431372549],...
+    'LineWidth',2,...
+    'LineStyle','-.');
+
+h=gcf;
+set(h,'PaperOrientation','landscape');
+set(h,'PaperPosition', [1 1 28 19]);
+print(gcf, '-dpdf', 'Figures/study2_significance.pdf');
+saveas(gcf,strcat('Figures/','study2_significance.fig'))
+
+
+%% Heatmap Significance
+for i=1:length(selected_bands_app3_top10)
+     band_name = "[" + mat2str(selected_bands_app3_top10{1, i}(1)) + ",  " + mat2str(selected_bands_app3_top10{1, i}(2)) + ",  " + mat2str(selected_bands_app3_top10{1, i}(4)) +"]";
+     xvalues_app3{1,i} = band_name;
+end
+yvalues = {'LF', 'HF', 'LF/HF', 'gMean'}
+
+A = [LF_percentage_app3_top10; HF_percentage_app3_top10; LF_HF_percentage_app3_top10; geomean_percentages_LF_HF_app3_top10];
+
+C = cell(1,14);
+C(:) = {''};
+
+fh = figure();
+fh.WindowState = 'maximized';
+subplot(27,7,[1:6,8:13])
+h = heatmap(A(1,:), 'ColorbarVisible', 'on');
+h.CellLabelFormat = '%.2f';
+% h.ColorScaling = 'scaledrows';
+% h.XDisplayLabels = xvalues_app3;
+h.XDisplayLabels = C;
+h.YDisplayLabels = yvalues(1);
+% h.Title = 'Approach 3 - GMean3 LF*HF*Ratio';
+% h.YLabel = 'Mean Correlation';
+ax = gca;
+ax.FontSize = 12; 
+colormap(flipud(pink))
+
+s = struct(h);
+s.YAxis.FontSize = 12;
+s.Colorbar.FontSize = 6.5; 
+
+
+subplot(27,7,[15:20,22:27])
+h = heatmap(A(2,:), 'ColorbarVisible', 'on');
+h.CellLabelFormat = '%.2f';
+% h.ColorScaling = 'scaledrows';
+% h.XDisplayLabels = xvalues_app3;
+h.XDisplayLabels = C;
+h.YDisplayLabels = yvalues(2);
+% h.Title = 'Approach 3 - GMean3 LF*HF*Ratio';
+% h.YLabel = 'Mean Correlation';
+ax = gca;
+ax.FontSize = 12; 
+colormap(flipud(pink))
+
+s = struct(h);
+s.YAxis.FontSize = 12;
+s.Colorbar.FontSize = 6.5; 
+
+subplot(27,7,[29:34,36:41])
+h = heatmap(A(3,:), 'ColorbarVisible', 'on');
+h.CellLabelFormat = '%.2f';
+% h.ColorScaling = 'scaledrows';
+% h.XDisplayLabels = xvalues_app3;
+h.XDisplayLabels = C;
+h.YDisplayLabels = yvalues(3);
+% h.Title = 'Approach 3 - GMean3 LF*HF*Ratio';
+% h.YLabel = 'Mean Correlation';
+ax = gca;
+ax.FontSize = 12; 
+colormap('pink')
+
+s = struct(h);
+s.YAxis.FontSize = 12;
+s.Colorbar.FontSize = 6.5; 
+
+subplot(27,7,[43:48,50:55])
+h = heatmap(A(4,:), 'ColorbarVisible', 'on');
+h.CellLabelFormat = '%.2f';
+% h.ColorScaling = 'scaledrows';
+h.XDisplayLabels = xvalues_app3;
+h.YDisplayLabels = yvalues(4);
+% h.Title = 'Approach 3 - GMean3 LF*HF*Ratio';
+% h.YLabel = 'Mean Correlation';
+ax = gca;
+ax.FontSize = 12;
+colormap('pink')
+
+s = struct(h);
+s.YAxis.FontSize = 12;
+s.Colorbar.FontSize = 6.5; 
+
+s = struct(h);
+s.XAxis.FontSize = 10;
+
+annotation(fh,'line',[0.679791666666667,0.679791666666667],[0.948961578400831,0.66896157840083],...
+    'Color',[1 0.411764705882353 0.16078431372549],...
+    'LineWidth',2,...
+    'LineStyle','-.');
+
+h=gcf;
+set(h,'PaperOrientation','landscape');
+set(h,'PaperPosition', [1 1 28 19]);
+print(gcf, '-dpdf', 'Figures/study2_percentage.pdf');
+saveas(gcf,strcat('Figures/','study2_percentage.fig'))
+
+
+
+
+

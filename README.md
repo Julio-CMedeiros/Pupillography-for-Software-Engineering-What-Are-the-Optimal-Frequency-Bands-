@@ -6,8 +6,6 @@ The MATLAB scripts included here are integral to the preprocessing and subsequen
 
 ### **Data Availability**
 All associated data, including:
-
-### **Experiment protocol**
 - Experiment protocol
 - Screening and experimental questionnaires
 - NASA-TLX and bug detection evaluation data

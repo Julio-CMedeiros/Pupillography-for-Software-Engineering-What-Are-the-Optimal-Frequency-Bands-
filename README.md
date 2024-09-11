@@ -1,13 +1,13 @@
 # Pupillography for Software Engineering: What Are the Optimal Frequency Bands? - MATLAB Supplementary
 This repository contains all the MATLAB codes used for preprocessing and analyzing the data in the study "Pupillography for Software Engineering: What Are the Optimal Frequency Bands?".
 
-Repository Contents
+### **Repository Contents**
 The MATLAB scripts included here are integral to the preprocessing and subsequent analysis performed in the published paper. These codes support the methodologies outlined and ensure reproducibility of the results.
 
-Data Availability
+### **Data Availability**
 All associated data, including:
 
-Experiment protocol
+### **Experiment protocol**
 Screening and experimental questionnaires
 NASA-TLX and bug detection evaluation data
 Examples of code snippets with bug locations and complexity information

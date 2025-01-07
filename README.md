@@ -1,4 +1,4 @@
-# Pupillography for Software Engineering: What Are the Optimal Frequency Bands? - MATLAB Supplementary
+# Optimal frequency bands for pupillography for maximal correlation with HRV - MATLAB Supplementary
 This repository contains all the MATLAB codes used for preprocessing and analyzing the data in the study "Pupillography for Software Engineering: What Are the Optimal Frequency Bands?".
 
 ### **Repository Contents**

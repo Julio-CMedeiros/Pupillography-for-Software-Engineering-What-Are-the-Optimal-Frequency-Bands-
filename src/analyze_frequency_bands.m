@@ -2,21 +2,31 @@ clear all
 % close all
 clc
 
+%% Load project configuration
+cfg = project_config();
+
 %% Load Files With the features
 % Bands Info 
-filename = strcat('bands_info.mat');
-load(fullfile(pwd,'Correlations_Files', filename), 'bands_info');
+filename = 'bands_info.mat';
+bands_info_file = cfg.files.bands_info;
+if isfile(bands_info_file)
+    load(bands_info_file, 'bands_info');
+else
+    warning('Bands info file not found: %s', bands_info_file);
+end
 
 % Correlation Results
-filename = strcat('PUP_global_correlation_xcorr_type_3_aux_dataset.mat');
-load(fullfile(pwd,'Correlations_Files', filename), 'PUP_global_correlation');
+filename = 'PUP_global_correlation_xcorr_type_3_aux_dataset.mat';
+results_file = cfg.files.pup_correlation;
+if isfile(results_file)
+    load(results_file, 'PUP_global_correlation');
+else
+    warning('Correlation results file not found: %s', results_file);
+end
 
 % Multicompare
-% filename = strcat('PUP_global_correlation_xcorr_type_3_multiCompareData.mat');
-% load(fullfile(pwd,'Correlations_Files', filename), 'multiCompareData');
-
-
-% load('D:\Delivery_AndreBernardes\Pupil_Code\Ricardo_DATA_CODES\Code\Study 1\main_funcs\2_Analyse_HRV_and_PUP_data\AndreBernardes_code\Correlations_Files\PUP_global_correlation_xcorr_type_3_detailed_infor.mat')
+% filename = 'PUP_global_correlation_xcorr_type_3_multiCompareData.mat';
+% load(fullfile(correlations_path, filename), 'multiCompareData');
 
 %% Compute geometric mean LF and HF
 LF_percentage = cell2mat(PUP_global_correlation.LF.Rejected_percentage_Pearson);
@@ -190,20 +200,21 @@ geomean_perm_app3_top10 = geomean_perm_LF_HF_ratio_clean(idx_top10_app3);
 % title('LF lag')
 % 
 % % SAVE
-% saveas(gcf,strcat('Figures/',filename(1:end-4),'_Approach3_LF_lag_Pearson.png'))
+% saveas(gcf, fullfile(figures_path, [filename(1:end-4) '_Approach3_LF_lag_Pearson.png']))
+
 % 
 % figure
 % histogram(HF_lag(:),[-50:50],'Normalization','probability')
 % title('HF lag')
 % 
 % % SAVE
-% saveas(gcf,strcat('Figures/',filename(1:end-4),'_Approach3_HF_lag_Pearson.png'))
+% % saveas(gcf, fullfile(figures_path, [filename(1:end-4) '_Approach3_HF_lag_Pearson.png']))
 %   
 % figure
 % histogram(LFHF_lag(:),[-50:50],'Normalization','probability')
 % title('LF/HF lag')
 % % SAVE
-% saveas(gcf,strcat('Figures/',filename(1:end-4),'_Approach3_LFHF_lag_Pearson.png'))
+% % saveas(gcf, fullfile(figures_path, [filename(1:end-4) '_Approach3_LFHF_lag_Pearson.png']))
 
 all_lags = zeros(3,12);
 
@@ -278,8 +289,8 @@ all_lags = zeros(3,12);
 % ax.FontSize = 14; 
 % colormap(pink)
 % % SAVE
-% % saveas(gcf,strcat('Figures/',filename(1:end-4),'_Approach3_top20_Pearson.png'))
-% % saveas(gcf,strcat('Figures/',filename(1:end-4),'_Approach3_top20_Pearson.fig'))
+% % saveas(gcf, fullfile(figures_path, [filename(1:end-4) '_Approach3_top20_Pearson.png']))
+% % saveas(gcf, fullfile(figures_path, [filename(1:end-4) '_Approach3_top20_Pearson.fig']))
 % 
 % 
 % 
@@ -300,8 +311,8 @@ all_lags = zeros(3,12);
 % 
 % h.XDisplayLabels = xvalues_app3;
 % 
-% % saveas(gcf,strcat('Figures/',filename(1:end-4),'_Approach3_significance_top20_Pearson.png'))
-% % saveas(gcf,strcat('Figures/',filename(1:end-4),'_Approach3_significance_top20_Pearson.fig'))
+% % saveas(gcf, fullfile(figures_path, [filename(1:end-4) '_Approach3_significance_top20_Pearson.png']))
+% % saveas(gcf, fullfile(figures_path, [filename(1:end-4) '_Approach3_significance_top20_Pearson.fig']))
 
 
 %% Heatmap CORR
@@ -401,8 +412,8 @@ annotation(fh,'line',[0.679791666666667,0.679791666666667],[0.948961578400831,0.
 h=gcf;
 set(h,'PaperOrientation','landscape');
 set(h,'PaperPosition', [1 1 28 19]);
-print(gcf, '-dpdf', 'Figures/study2_corr.pdf');
-saveas(gcf,strcat('Figures/','study2_corr.fig'))
+print(gcf, '-dpdf', fullfile(cfg.results.figures, 'study2_corr.pdf'));
+saveas(gcf, fullfile(cfg.results.figures, 'study2_corr.fig'))
 
 
 
@@ -488,8 +499,8 @@ annotation(fh,'line',[0.679791666666667,0.679791666666667],[0.948961578400831,0.
 h=gcf;
 set(h,'PaperOrientation','landscape');
 set(h,'PaperPosition', [1 1 28 19]);
-print(gcf, '-dpdf', 'Figures/study2_significance.pdf');
-saveas(gcf,strcat('Figures/','study2_significance.fig'))
+print(gcf, '-dpdf', fullfile(cfg.results.figures, 'study2_significance.pdf'));
+saveas(gcf, fullfile(cfg.results.figures, 'study2_significance.fig'))
 
 
 %% Heatmap Significance
@@ -585,8 +596,8 @@ annotation(fh,'line',[0.679791666666667,0.679791666666667],[0.948961578400831,0.
 h=gcf;
 set(h,'PaperOrientation','landscape');
 set(h,'PaperPosition', [1 1 28 19]);
-print(gcf, '-dpdf', 'Figures/study2_percentage.pdf');
-saveas(gcf,strcat('Figures/','study2_percentage.fig'))
+print(gcf, '-dpdf', fullfile(cfg.results.figures, 'study2_percentage.pdf'));
+saveas(gcf, fullfile(cfg.results.figures, 'study2_percentage.fig'))
 
 
 

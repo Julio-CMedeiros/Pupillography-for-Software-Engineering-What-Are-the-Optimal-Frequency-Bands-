@@ -10,20 +10,21 @@ clear all
 % close all
 clc
 
-%%
-mfilename
-%%
-current_file_path = matlab.desktop.editor.getActiveFilename;
-current_file = [mfilename '.m'];
-main_path = current_file_path(1:end-length(current_file));
+%% Load project configuration
+cfg = project_config();
 
-addpath(genpath(main_path));
+% Define data and results paths from config
+data_path = cfg.data.raw;
+results_path = fileparts(cfg.results.features);
+processed_ecg_data_path = cfg.data.ecg;
 
-main_path = current_file_path(1:end-length(current_file));
-processed_ecg_data_path = [main_path 'Datasets/rr-data/\Niazy_aux_dataset/'];
-
-
-load('D:\DesiredPath\orders_id_sub_hrv_aux_dataset.mat')
+% Load the orders file - Update path to match your data location
+orders_file = cfg.files.orders_hrv;
+if isfile(orders_file)
+    load(orders_file);
+else
+    warning('Orders file not found: %s. Please ensure data is in the correct folder.', orders_file);
+end
 
 
 for j=1:30
@@ -37,50 +38,51 @@ for j=1:30
             subject = ['S' num2str(j)];
     end
         
-    processed_ecg_file_name = [subject '_run0' num2str(run_number) '_500hz_QRS.mat']
+    processed_ecg_file_name = [subject '_run0' num2str(run_number) '_500hz_QRS.mat'];
     
     %keyboard;
-    if ~isfile([processed_ecg_data_path processed_ecg_file_name])
-        warning('Processed ECG file were not found!!!');
+    current_ecg_file = fullfile(processed_ecg_data_path, processed_ecg_file_name);
+    if ~isfile(current_ecg_file)
+        warning('Processed ECG file not found: %s', current_ecg_file);
         continue;
     end
     
     
     % Load the data from 1 run from a patient
     % struct -> ECG
-    processed_ECG_data = load([processed_ecg_data_path processed_ecg_file_name]);
+    processed_ECG_data = load(current_ecg_file);
     processed_ECG_data = processed_ECG_data.ECG;
     
     
        
      %% HRV Analysis
 
-    ecg_fs = processed_ECG_data.srate; % Sample Frequency do ECG
-    ecg_data = processed_ECG_data.data; % Dados
-    ecg_time = processed_ECG_data.times/ecg_fs; % Para ficar em segundos
+    ecg_fs = processed_ECG_data.srate; % ECG Sample Frequency
+    ecg_data = processed_ECG_data.data; % Data
+    ecg_time = processed_ECG_data.times/ecg_fs; % Convert to seconds
 
 
     %% get data from ECG structure
 
     events = reshape(struct2cell(processed_ECG_data.event),3,[])'; % events to cell array
     eeg_data.events = events;
-    indexes_events.ind_qrs = find(strcmp(events(:,1),'qrs')); % Indices correspondentes aos QRS no events
+    indexes_events.ind_qrs = find(strcmp(events(:,1),'qrs')); % Indices corresponding to QRS in events
 
-    times_events.qrs_time = cell2mat(events(indexes_events.ind_qrs,2)); % Valores onde ocorrem os QRS na Data
-    %qrs_time = qrs_samples; % já são valores (processed_ECG_data.times(qrs_samples)'/ecg_fs;) 
+    times_events.qrs_time = cell2mat(events(indexes_events.ind_qrs,2)); % Values where QRS occurs in Data
+    %qrs_time = qrs_samples; % already values (processed_ECG_data.times(qrs_samples)'/ecg_fs;) 
                                  
 
     % 99- Run start
     eeg_data.time_start_run = [];
     indexes_events.ind_start_run = find(strcmp(events(:,1),'99'));
     eeg_data.sample_start_run = cell2mat(events(indexes_events.ind_start_run,2));
-    eeg_data.time_start_run = eeg_data.sample_start_run/ecg_fs; % em segundos
+    eeg_data.time_start_run = eeg_data.sample_start_run/ecg_fs; % in seconds
 
     % 1- Code with bugs
     times_events.time_code = [];
     indexes_events.ind_code = find(strcmp(events(:,1),'1'));
     eeg_data.sample_code = cell2mat(events(indexes_events.ind_code,2));
-    eeg_data.time_code = eeg_data.sample_code/ecg_fs; % em segundos
+    eeg_data.time_code = eeg_data.sample_code/ecg_fs; % in seconds
 
     % 3- Text
     times_events.time_text = [];
@@ -92,52 +94,52 @@ for j=1:30
     other_events([indexes_events.ind_qrs(:)],:) = [];
 
     if isempty(eeg_data.time_start_run) 
-        % Assumimos que começou 30 seg antes do primeiro "trigger" caso não seja encontrado
+        % Assume it started 30 sec before the first "trigger" if not found
         eeg_data.time_start_run = cell2mat(events(min([indexes_events.ind_text indexes_events.ind_code]),2))/ecg_fs-30;
     end
     
 
     times_events.time_other_events = cell2mat(other_events(:,2))/ecg_fs;
     times_events.time_other_events = times_events.time_other_events-eeg_data.time_start_run; 
-    % este desconto que estamos a fazer aqui do time_start_run, pq não fazemos
-    % nos outros parametros?
+    % This discount we're making here from time_start_run, why don't we do it
+    % on other parameters?
 
     % 15- Fixation cross
     times_events.time_fix = [];
     indexes_events.ind_fix = find(strcmp(other_events(:,1),'15')); %cruz
     times_events.time_fix = times_events.time_other_events(indexes_events.ind_fix);
 
-    ecg_time = ecg_time-eeg_data.time_start_run; % descontar o tempo que demorou a começar a run
+    ecg_time = ecg_time-eeg_data.time_start_run; % subtract the time it took to start the run
 
 
     %% Find R-peaks locations 
 
-    %já feito, os R-peaks correspondem ao QRS que vão ser os dRp_time
+    % Already done, R-peaks correspond to QRS which will be the dRp_time
 
-    dRp_time = times_events.qrs_time/ecg_fs; % =>  Passei para segundos
+    dRp_time = times_events.qrs_time/ecg_fs; % =>  Converted to seconds
     dRp_time = unique(dRp_time);
 
     %% Remove outliers
-    dRp = diff(dRp_time); % Calcula a diferença entre os pontos adjacentes (NN)
-    dRp = [dRp(1);dRp]; % Assumimos o 1 como igual ao 2
+    dRp = diff(dRp_time); % Calculate the difference between adjacent points (NN)
+    dRp = [dRp(1);dRp]; % Assume the first value equals the second
 
     [ind_in,ind_out] = RemoveOutliersPupilD(dRp,3,0);
 
     dRp = interp1(dRp_time(ind_in),dRp(ind_in),dRp_time,'linear'); 
-    % -> interpolação para ficar no formato original (tamnho e espaçamento entre pontos, evitar "buracos")
+    % -> interpolation to maintain original format (size and spacing between points, avoid "gaps")
 
     %% Resample RR data
-    % estávamos a ir 1/8 de ms em 1/8 de ms -> passei tudo para segundos
+    % We were going from 1/8 ms to 1/8 ms -> converted everything to seconds
     new_dRp.fs = 8; % guidelines*
 
-    new_dRp.time_resamp = dRp_time(1):1/new_dRp.fs:dRp_time(end); % usar como time
-    new_dRp.resamp = interp1(dRp_time,dRp,new_dRp.time_resamp,'spline'); % usar como data
+    new_dRp.time_resamp = dRp_time(1):1/new_dRp.fs:dRp_time(end); % use as time
+    new_dRp.resamp = interp1(dRp_time,dRp,new_dRp.time_resamp,'spline'); % use as data
     % interp1(x -> tempos, values, new_x -> new_times, 'método')
 
     % ecgLowPass
     %par=0.25;
     ord=fix(0.25*length(new_dRp.resamp)); % ord=fix(par*length(new_dRp_resamp))
-    %fix arredonda para baixo (= floor)
+    % fix rounds down (= floor)
     new_dRp.resamp= ecgLowPass(new_dRp.resamp,new_dRp.fs,1,1,ord); 
 
     %% Plot RR signals (org and resamp)
@@ -149,7 +151,7 @@ for j=1:30
 
 
     %% Get data sections 
-    % Alguns dos parametros aqui estão vazios
+    % Some of the parameters here are empty
     disp('*******Getting time series corresponding to rest and code*****')
 
     offset_start=10; %% offset for trigger 2,4,5 -> start/end x secods after/before the trigger
@@ -157,7 +159,7 @@ for j=1:30
     
     time = new_dRp.time_resamp;
 
-    % Ir buscar os triggers para conseguir dividir em neutro, rest e code
+    % Get the triggers to divide into neutral, rest and code
     
     trigger_text_start = processed_ECG_data.eventV2.taskEvents(2).Duration;
     trigger_text_end = processed_ECG_data.eventV2.taskEvents(3).Duration;
@@ -224,12 +226,12 @@ for j=1:30
     lines_td = ["T"; "mRR"; "sdnnRR"; "sdsdRR"; "rmssd"; "nn50RR"; "pnn50RR"; "ApEn_value"; "SD1"; "SD2"; "KFD"; "HFD"; "PTM"; "SI"; "TI"; "TINN"];
 
     
-    for i=1 % para 180 secs so
+    for i=1 % for 180 secs only
     % for i=1:length(windows_list)
         % ------- Parameter initialization ------
-        just_one_value = false; % Para otimizar o programa quando só existe necessidade de calc um valor
+        just_one_value = false; % To optimize the program when there is only need to calculate one value
         
-        type_order = 3; % 1 para sub/run; 2 para sub; 3 para geral
+        type_order = 3; % 1 for sub/run; 2 for sub; 3 for general
         criteria = 2; % 1 AIC // 2 BIC // 3 MDL
         
         labels_sub_id = orders_id_sub.labels;
@@ -256,20 +258,20 @@ for j=1:30
         order = 27;
         
         typePsd = 0; %% burg
-        display = 0; % mudei para 0, 1 aparecem gráficos
+        display = 0; % changed to 0, 1 shows graphs
         
         window_secs = windows_list(i);
         window_samp =  window_secs * new_dRp.fs;
         
         jump_secs = 1;
-        jump_samp = floor(jump_secs*new_dRp.fs); % floor - arredondamento para baixo
+        jump_samp = floor(jump_secs*new_dRp.fs); % floor - rounding down
         
         freq_vec = 0:0.01:10;
         freq_bands = [0 0.04 0.15 0.4];
         
         %% CODE
         % ------- Features extraction ------
-        % --- Domínio da frequência ---
+        % --- Frequency domain ---
         [global_features_HRV{subject_id,run_number}.code{1, i}, global_features_HRV{subject_id,run_number}.code{2, i},  global_features_HRV{subject_id,run_number}.code{3, i} ...
             , global_features_HRV{subject_id,run_number}.code{4, i}, global_features_HRV{subject_id,run_number}.code{5, i}, global_features_HRV{subject_id,run_number}.code{6, i} ...
             , global_features_HRV{subject_id,run_number}.code{7, i}, global_features_HRV{subject_id,run_number}.code{8, i} ...
@@ -296,11 +298,11 @@ for j=1:30
           global_features_HRV_fd{subject_id,run_number}.code{14, i} = global_features_HRV{subject_id,run_number}.code{9, i}(2,:);
           global_features_HRV_fd{subject_id,run_number}.code{15, i} = global_features_HRV{subject_id,run_number}.code{9, i}(3,:);
           
-         % Acrescentar LF/HF
+         % Add LF/HF ratio
          global_features_HRV_fd{subject_id,run_number}.code{16, i} = global_features_HRV{subject_id,run_number}.code{5, i}(2,:) ./ global_features_HRV{subject_id,run_number}.code{5, i}(3,:);
          global_features_HRV_fd{subject_id,run_number}.code{17, i} = global_features_HRV{subject_id,run_number}.code{8, i}(2,:) ./ global_features_HRV{subject_id,run_number}.code{8, i}(3,:);
         
-         % --- Domínio do Tempo e Domínio não Linear ---
+         % --- Time Domain and Nonlinear Domain ---
           [global_features_HRV_td{subject_id,run_number}.code{1, i}, global_features_HRV_td{subject_id,run_number}.code{2, i}, global_features_HRV_td{subject_id,run_number}.code{3, i}...
               , global_features_HRV_td{subject_id,run_number}.code{4, i}, global_features_HRV_td{subject_id,run_number}.code{5, i}, global_features_HRV_td{subject_id,run_number}.code{6, i}...
               , global_features_HRV_td{subject_id,run_number}.code{7, i},global_features_HRV_td{subject_id,run_number}.code{8, i},global_features_HRV_td{subject_id,run_number}.code{9, i}...
@@ -308,8 +310,8 @@ for j=1:30
               , global_features_HRV_td{subject_id,run_number}.code{13, i}, global_features_HRV_td{subject_id,run_number}.code{14, i}, global_features_HRV_td{subject_id,run_number}.code{15, i} ...
               , global_features_HRV_td{subject_id,run_number}.code{16, i}] = TimeVariant_hrv_TimeAnalysis(new_dRp.resamp_time_code,new_dRp.resamp_data_code*1000,window_samp,jump_samp, window_secs, just_one_value);
 
-        % Descartar primeiros valores - estes são valores de padding, zeros
-        % ou NaN
+        % Discard initial values - these are padding values, zeros
+        % or NaN
           for feature = 1:length(lines_td)
               try
                   limit_discarted = ceil(window_secs/2);
@@ -344,5 +346,5 @@ end
 
 %  filename = strcat('global_features_HRV_fd_try2_median_type',num2str(type_order),'aux_dataset.mat');
 filename = strcat('global_features_HRV_fd_try2_aux_dataset_new.mat');
- save(fullfile(main_path,'Extracted_Features_Structs', filename), 'global_features_HRV_fd');
+save(fullfile(cfg.results.features, filename), 'global_features_HRV_fd');
  

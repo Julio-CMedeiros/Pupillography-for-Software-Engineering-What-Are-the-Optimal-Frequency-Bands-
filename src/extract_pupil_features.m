@@ -10,20 +10,40 @@ clear all
 close all
 clc
 
-addpath(genpath('DesiredPath1'))
+%% Load project configuration
+cfg = project_config();
 
-eeglab
+% EEGLAB check (requires EEGLAB to be installed and in the path)
+if exist('eeglab', 'file')
+    eeglab;
+else
+    warning('EEGLAB not found in path. Some functions may fail.');
+end
 
-%%
-package_path = 'DesiredPath1'; %update this to the current package path
+%% Update these paths to match your local dataset structure
+processed_data_path = fullfile(cfg.data.pupil_processed, 'Stage 1');
+save_file_path_clean = fullfile(cfg.results.processed, 'Study 1', 'Stage 2');
+save_file_path = fullfile(cfg.results.processed, 'Study 1', 'Stage 3');
 
-data_path = [package_path '/Data/'];
-processed_data_path = [data_path 'Processed/Study 1/Stage 1/'];
-save_file_path_clean = [data_path 'Processed/Study 1/Stage 2/'];
-save_file_path = [data_path 'Processed/Study 1/Stage 3/'];
+% Ensure results directories exist
+if ~exist(save_file_path_clean, 'dir'), mkdir(save_file_path_clean); end
+if ~exist(save_file_path, 'dir'), mkdir(save_file_path); end
 
-load('DesiredPath1\orders_id_sub_0004_aux_dataset.mat');
-load('DesiredPath2\database_pupil_ECG.mat')
+% Load required data files
+orders_file = cfg.files.orders_pupil;
+database_file = cfg.files.database_pupil;
+
+if isfile(orders_file)
+    load(orders_file);
+else
+    warning('Orders file not found: %s', orders_file);
+end
+
+if isfile(database_file)
+    load(database_file);
+else
+    warning('Database file not found: %s', database_file);
+end
 
 %% Set global variables of the eyetracker
 screen_boundaries_x = [0 1920];
@@ -215,8 +235,8 @@ for i=1:32
         
         %% Remove low frequency below 0.0004
         
-        % adicionar passa baixo ver abaixo dos 4Hz due to jittering movements artifacts.
-        % adicionar passa alto 0.0004Hz to reduce the impact of medium-term nonstationary components present in the time interval being analyzed
+        % Add low-pass filter below 4Hz due to jittering movements artifacts.
+        % Add high-pass filter 0.0004Hz to reduce the impact of medium-term nonstationary components present in the time interval being analyzed
         
         
         data4 = new_x;
@@ -264,7 +284,7 @@ for i=1:32
         %         ax.XLim = [500 550];
         % %         ax.YLim = [0 4.000];
         %         set(gca,'FontSize',20)
-        %         saveas(gcf,'Figures/Pre_Processed_PUP_aux_dataset.png')
+        %         saveas(gcf, fullfile(figures_path, 'Pre_Processed_PUP_aux_dataset.png'))
         
         %%
         data_pupil_diam = data4;
@@ -338,9 +358,9 @@ for i=1:32
         %lines_fd = {'totPow'; 'Peak'; 'VLF'; 'LF'; 'HF'; 'VLFpeak'; 'LFpeak'; 'HFpeak';'VLFnu'; 'LFnu'; 'HFnu'; 'VLFpeak-nu'; 'LFpeak-nu'; 'HFpeak-nu'; 'LF/HF'; 'LFpeak/HFpeak'};
         
         % Parameter initialization
-        just_one_value = false; % Para otimizar o programa quando só existe necessidade de calc um valor (só usamos dps)
+        just_one_value = false; % To optimize the program when there is only need to calculate one value (only used later)
         
-        type_order = 3; % 1 para sub/run; 2 para sub; 3 para geral
+        type_order = 3; % 1 for sub/run; 2 for sub; 3 for general
         criteria = 2; % 1 AIC // 2 BIC // 3 MDL
         
         labels_sub_id = orders_id_sub.labels;
@@ -366,8 +386,8 @@ for i=1:32
         order = round(median_result);
         order = max(order,149);
         
-        typePsd = 0; % burg
-        display = 0; % mudei para 0, 1 aparecem gráficos
+        typePsd = 0; %% burg
+        display = 0; % changed to 0, 1 shows graphs
         
         window_secs = 180; %25;
         window_samp =  window_secs * fs;
@@ -377,7 +397,7 @@ for i=1:32
         
         freq_vec = 0:0.005:10;
         
-        %% PSD computation - //Já descarta valores iniciais e finais
+        %% PSD computation - Already discards initial and final values
         % ----- CODE -----
         [global_features_PUP_PSD{subject_id,run_number}.code.psd_time, global_features_PUP_PSD{subject_id,run_number}.code.psd_freq,...
             global_features_PUP_PSD{subject_id,run_number}.code.psd] = PSD_TimeVariant_FreqAnalysis(code.time_code, code.data_code, fs, typePsd, freq_vec, window_samp, jump_samp, display, false, window_secs,order);
@@ -498,7 +518,11 @@ for i=1:32
         global_features_PUP_fd_corr_iteration = global_features_PUP_fd_corr(subject_id,:);
         global_features_PUP_fd_corr_iteration{1,5}=(subject_id);
         filename = "global_features_PUP_fd_corr_part" + mat2str(subject_id) + "_aux_dataset.mat";
-        save(fullfile('DesiredPath1\Code\Study 1\main_funcs\2_Analyse_HRV_and_PUP_data\AndreBernardes_code\Extracted_PUPfeatures_Structs\PUP_corr_parts_type_3_aux_dataset', filename), 'global_features_PUP_fd_corr_iteration','-v7.3');
+        
+        save_path = fullfile(cfg.results.pupil_features, 'PUP_corr_parts_type_3_aux_dataset');
+        if ~exist(save_path, 'dir'), mkdir(save_path); end
+        
+        save(fullfile(save_path, filename), 'global_features_PUP_fd_corr_iteration','-v7.3');
         clearvars global_features_PUP_fd_corr_iteration;
         clearvars global_features_PUP_fd_corr;
         
@@ -506,7 +530,11 @@ for i=1:32
         
         global_features_PUP_fd_corr_iteration{1,5}=(subject_id);
         filename = "global_features_PUP_fd_corr_part" + mat2str(subject_id) + "_aux_dataset.mat";
-        save(fullfile('DesiredPath1\Code\Study 1\main_funcs\2_Analyse_HRV_and_PUP_data\AndreBernardes_code\Extracted_PUPfeatures_Structs\PUP_corr_parts_type_3_aux_dataset', filename), 'global_features_PUP_fd_corr_iteration','-v7.3');
+        
+        save_path = fullfile(cfg.results.pupil_features, 'PUP_corr_parts_type_3_aux_dataset');
+        if ~exist(save_path, 'dir'), mkdir(save_path); end
+        
+        save(fullfile(save_path, filename), 'global_features_PUP_fd_corr_iteration','-v7.3');
         clearvars global_features_PUP_fd_corr_iteration;
         clearvars global_features_PUP_fd_corr;
         
